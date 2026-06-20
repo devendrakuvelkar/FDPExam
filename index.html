@@ -324,8 +324,6 @@
       <div><div class="num" id="res-answered">0/50</div><div class="lbl">Answered</div></div>
       <div><div class="num" id="res-time">00:00</div><div class="lbl">Time Taken</div></div>
     </div>
-    <button class="btn btn-primary btn-full" id="download-btn">Download my responses (.csv)</button>
-    <p style="font-size:.76rem; margin-top:14px;">Keep this file as your submission record until results are announced.</p>
   </div>
 </div>
 
@@ -688,20 +686,26 @@
     el('res-time').textContent = m + ':' + s;
 
     const payload = buildPayload(elapsedSec, timedOut);
-    el('download-btn').addEventListener('click', () => downloadCsv(payload));
-    // auto-download once immediately so a record exists even if the student closes the tab
-    downloadCsv(payload);
 
-    if (ENDPOINT_URL){
-      fetch(ENDPOINT_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: {'Content-Type':'text/plain;charset=utf-8'},
-        body: JSON.stringify(payload)
-      }).catch(() => { toast('Could not reach the server — your CSV download is your backup record.'); });
+    if (ENDPOINT_URL) {
+        fetch(ENDPOINT_URL, {
+            method: "POST",
+            headers: {
+                "Content-Type": "text/plain;charset=UTF-8"
+            },
+            body: JSON.stringify(payload)
+        })
+        .then(response => response.text())
+        .then(data => {
+            console.log("Submission successful:", data);
+            toast("Responses submitted successfully.");
+        })
+        .catch(error => {
+            console.error(error);
+            toast("Submission failed. Please check your internet connection.");
+        });
     }
-  }
-
+    
   function buildPayload(elapsedSec, timedOut){
     const score = state.answers.reduce((sum, a, i) => sum + (a !== null && a === ANSWER_KEY[i] ? 1 : 0), 0);
     return {
