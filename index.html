@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>MCQ Quiz by NIT Goa for MIT-WPU students under NAIP</title>
+<title>MCQ Quiz · AI, ML, Deep Learning & Related Topics</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
@@ -203,7 +203,7 @@
         <text x="32" y="41" text-anchor="middle" font-family="Source Serif 4, serif" font-size="11" font-weight="700" fill="#2F5C58">DL</text>
       </svg>
       <div>
-        <h1>Foundation and Advances in Deep Learning and Generative AI</h1>
+        <h1>AI, Machine Learning &amp; Deep Learning</h1>
         <div class="sub">Multiple Choice Question (MCQ) Quiz &middot; Related Topics</div>
       </div>
     </div>
@@ -211,12 +211,13 @@
     <div class="meta-strip">
       <span>50 marks</span>
       <span>50 questions</span>
-      <span>30 minutes*</span>
+      <span id="meta-duration">40 minutes</span>
       <span>1 mark each</span>
     </div>
 
     <div class="notice">
-      <span>This is a timed, proctored exam. The countdown starts the moment you click <strong>Begin Exam</strong> and cannot be paused. Right-click, text selection, and copy/paste are disabled for the duration of the test. Switching tabs is recorded.</span>
+      <span>&#9888;</span>
+      <span>This is a timed, proctored exam. The countdown starts the moment you click <strong>Begin Exam</strong> and cannot be paused. Right-click, text selection, and copy/paste are disabled for the duration of the test. <strong>Switching tabs or apps is not allowed</strong> — it is detected, and your exam will be <strong>automatically submitted</strong> after <span id="meta-max-switches">3</span> such attempts.</span>
     </div>
 
     <hr>
@@ -357,13 +358,14 @@
      distributed to students until this URL is filled in and tested.
      ───────────────────────────────────────────────────────────────
   */
-  const ENDPOINT_URL = "https://script.google.com/macros/s/AKfycbxOTgjikBkevMt5LPEOdHoDVaSy-JnM2bJ5DN-8a1Ybz_Iu_SK9kPRvUl_66RwYEveB/exec";
+  const ENDPOINT_URL = "";
 
   if (!ENDPOINT_URL){
     console.warn('[Exam] ENDPOINT_URL is blank — submissions will NOT be saved anywhere. Set this before distributing the exam to students.');
   }
 
   const TOTAL_SECONDS = 40 * 60;
+  const MAX_TAB_SWITCHES = 3; // exam auto-submits once this many tab/app switches are detected
 
   /* ============ QUESTION BANK ============ */
   const QUESTIONS = [
@@ -491,6 +493,8 @@
 
   /* ============ ELEMENTS ============ */
   const el = id => document.getElementById(id);
+  el('meta-duration').textContent = Math.round(TOTAL_SECONDS / 60) + ' minutes';
+  el('meta-max-switches').textContent = MAX_TAB_SWITCHES;
   const landingScreen = el('landing-screen');
   const quizScreen = el('quiz-screen');
   const resultsScreen = el('results-screen');
@@ -531,9 +535,13 @@
     if (blocked){ e.preventDefault(); toast('This action is disabled during the exam.'); }
   });
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden && quizScreen && !quizScreen.classList.contains('hidden') && !state.submitted){
+    if (!quizScreen || quizScreen.classList.contains('hidden') || state.submitted) return;
+    if (document.hidden){
       state.tabSwitches++;
-      toast('Tab switch detected (' + state.tabSwitches + '). This is recorded.');
+      if (state.tabSwitches >= MAX_TAB_SWITCHES) doSubmit('tabSwitch');
+    } else if (state.tabSwitches > 0 && state.tabSwitches < MAX_TAB_SWITCHES){
+      const remaining = MAX_TAB_SWITCHES - state.tabSwitches;
+      toast(`Tab switch detected (${state.tabSwitches}/${MAX_TAB_SWITCHES}). ${remaining} more and your exam will be auto-submitted.`);
     }
   });
 
@@ -610,7 +618,7 @@
     if (state.secondsLeft <= 0){
       state.secondsLeft = 0;
       updateTimerDisplay();
-      doSubmit(true);
+      doSubmit('timeout');
       return;
     }
     updateTimerDisplay();
@@ -706,7 +714,7 @@
   el('submit-btn').addEventListener('click', openConfirm);
   el('submit-btn-mobile').addEventListener('click', () => { el('mobile-sheet-overlay').classList.add('hidden'); openConfirm(); });
   el('confirm-cancel').addEventListener('click', () => el('confirm-overlay').classList.add('hidden'));
-  el('confirm-submit').addEventListener('click', () => doSubmit(false));
+  el('confirm-submit').addEventListener('click', () => doSubmit('manual'));
 
   function openConfirm(){
     const unanswered = state.answers.filter(a => a === null).length;
@@ -716,12 +724,14 @@
     el('confirm-overlay').classList.remove('hidden');
   }
 
-  function doSubmit(timedOut){
+  function doSubmit(reason){
+    // reason: 'manual' | 'timeout' | 'tabSwitch'
     if (state.submitted) return;
     state.submitted = true;
     clearInterval(state.timerHandle);
     el('confirm-overlay').classList.add('hidden');
-    if (timedOut) toast('Time is up — your exam has been auto-submitted.');
+    if (reason === 'timeout') toast('Time is up — your exam has been auto-submitted.');
+    if (reason === 'tabSwitch') toast(`Tab-switch limit (${MAX_TAB_SWITCHES}) reached — your exam has been auto-submitted.`);
 
     const elapsedSec = Math.round((Date.now() - state.startedAt) / 1000);
     const answeredCount = state.answers.filter(a => a !== null).length;
@@ -735,7 +745,7 @@
     const s = (elapsedSec%60).toString().padStart(2,'0');
     el('res-time').textContent = m + ':' + s;
 
-    const payload = buildPayload(elapsedSec, timedOut);
+    const payload = buildPayload(elapsedSec, reason);
 
     if (ENDPOINT_URL){
       fetch(ENDPOINT_URL, {
@@ -749,7 +759,7 @@
     }
   }
 
-  function buildPayload(elapsedSec, timedOut){
+  function buildPayload(elapsedSec, reason){
     const score = state.answers.reduce((sum, a, i) => sum + (a !== null && a === ANSWER_KEY[i] ? 1 : 0), 0);
     return {
       timestamp: new Date().toISOString(),
@@ -757,7 +767,8 @@
       roll: state.roll,
       email: state.email,
       elapsedSeconds: elapsedSec,
-      timedOut: timedOut,
+      timedOut: reason === 'timeout',
+      autoSubmitReason: reason, // 'manual' | 'timeout' | 'tabSwitch'
       tabSwitches: state.tabSwitches,
       score: score,
       totalMarks: QUESTIONS.length,
