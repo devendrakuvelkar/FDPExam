@@ -492,8 +492,8 @@
 
   /* ============ ELEMENTS ============ */
   const el = id => document.getElementById(id);
-  el('meta-duration').textContent = Math.round(TOTAL_SECONDS / 60) + ' minutes';
-  el('meta-max-switches').textContent = MAX_TAB_SWITCHES;
+  if (el('meta-duration')) el('meta-duration').textContent = Math.round(TOTAL_SECONDS / 60) + ' minutes';
+  if (el('meta-max-switches')) el('meta-max-switches').textContent = MAX_TAB_SWITCHES;
   const landingScreen = el('landing-screen');
   const quizScreen = el('quiz-screen');
   const resultsScreen = el('results-screen');
